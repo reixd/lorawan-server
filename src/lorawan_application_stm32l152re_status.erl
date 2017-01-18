@@ -21,10 +21,12 @@ handle_join(_LinkAddr, _App, _AppID) ->
 % the data structure is explained in
 % FIXME
 handle_rx(DevAddr, _App, _AppID, #rxdata{port=2, data= <<LED:8/integer, Batt:8/integer, $#, Payload/binary >>}) ->
-    LED_Offset = 61,
-    lager:debug("PUSH_DATA DevAddr:~w LED:~w Batt:~w Payload:~w",[DevAddr, (LED-LED_Offset), Batt, Payload]),
+    lager:debug("PUSH_DATA DevAddr:~w LED:~w Batt:~w% Payload:~w",[DevAddr, LED, (Batt*100/255), Payload]),
     % blink with the LED indicator
-    {send, #txdata{port=2, data= <<((LED - LED_Offset + 1) rem 2)>>}};
+    {send, #txdata{port=2, data= <<((LED + 1) rem 2)>>}};
+
+handle_rx(DevAddr, _App, AppID, #rxdata{last_lost=true}) ->
+    retransmit;
 
 handle_rx(_LinkAddr, _App, _AppID, RxData) ->
     lager:debug("[stm32l152re_status::handle_rx] ~w ~w ~w ~w",[_LinkAddr, _App, _AppID, RxData]),

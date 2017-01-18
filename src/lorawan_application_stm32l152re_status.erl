@@ -21,7 +21,7 @@ handle_join(_LinkAddr, _App, _AppID) ->
 % the data structure is explained in
 % FIXME
 handle_rx(DevAddr, _App, _AppID, #rxdata{port=2, data= <<LED:8/integer, Batt:8/integer, $#, Payload/binary >>}) ->
-    lager:debug("PUSH_DATA DevAddr:~w LED:~w Batt:~w% Payload:~w",[DevAddr, LED, (Batt*100/255), Payload]),
+    lager:debug("PUSH_DATA DevAddr:~w LED:~w Batt:~w% Payload:~w",[DevAddr, LED, (Batt*100 div 255), Payload]),
     % blink with the LED indicator
     {send, #txdata{port=2, data= <<((LED + 1) rem 2)>>}};
 

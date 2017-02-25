@@ -5,7 +5,7 @@
 %
 -module(lorawan_admin).
 
--export([handle_authorization/2, get_filters/1, paginate/3]).
+-export([handle_authorization/2, get_filters/1, sort/2, paginate/3]).
 -export([parse_admin/1, build_admin/1]).
 
 -include_lib("lorawan_server_api/include/lorawan_application.hrl").
@@ -32,6 +32,24 @@ get_filters(Req) ->
     case cowboy_req:match_qs([{'_filters', [], <<"{}">>}], Req) of
         #{'_filters' := Filter} ->
             jsx:decode(Filter, [{labels, atom}])
+    end.
+
+sort(Req, List) ->
+    case cowboy_req:match_qs([{'_sortDir', [], <<"ASC">>}, {'_sortField', [], undefined}], Req) of
+        #{'_sortField' := undefined} ->
+            List;
+        #{'_sortDir' := <<"ASC">>, '_sortField' := Field} ->
+            Field2 = binary_to_existing_atom(Field, latin1),
+            lists:sort(
+                fun(A,B) ->
+                    proplists:get_value(Field2, A) =< proplists:get_value(Field2, B)
+                end, List);
+        #{'_sortDir' := <<"DESC">>, '_sortField' := Field} ->
+            Field2 = binary_to_existing_atom(Field, latin1),
+            lists:sort(
+                fun(A,B) ->
+                    proplists:get_value(Field2, A) >= proplists:get_value(Field2, B)
+                end, List)
     end.
 
 paginate(Req, State, List) ->
@@ -90,14 +108,14 @@ parse_adr(List) ->
     {proplists:get_value(power, List), proplists:get_value(datr, List),
         case proplists:get_value(chans, List, null) of
             null -> undefined;
-            Val -> binary_to_integer(Val, 2)
+            Val -> text_to_intervals(binary_to_list(Val))
         end}.
 
 build_adr({TXPower, DataRate, Chans}) ->
     [{power, TXPower}, {datr, DataRate}, {chans,
         case Chans of
             undefined -> null;
-            Val when is_integer(Val) -> integer_to_binary(Val, 2)
+            Val -> list_to_binary(intervals_to_text(Val))
         end}].
 
 parse_devstat(List) ->
@@ -105,5 +123,37 @@ parse_devstat(List) ->
 
 build_devstat({Battery, Margin}) ->
     [{battery, Battery}, {margin, Margin}].
+
+intervals_to_text(List) when is_list(List) ->
+    lists:flatten(string:join(
+        lists:map(
+            fun ({A, A}) -> integer_to_list(A);
+                ({B, C}) -> [integer_to_list(B), "-", integer_to_list(C)]
+            end, List), ", "));
+intervals_to_text(_) ->
+    % this is for backward compatibility, will be removed in few months
+    % I don't think anyone ever used anything else than 7
+    "0-2".
+
+text_to_intervals(Text) ->
+    lists:map(
+        fun (Item) ->
+            case string:tokens(Item, "- ") of
+                [A] -> {list_to_integer(A), list_to_integer(A)};
+                [B, C] -> {list_to_integer(B), list_to_integer(C)}
+            end
+        end, string:tokens(Text, ";, ")).
+
+-include_lib("eunit/include/eunit.hrl").
+
+bits_test_()-> [
+    ?_assertEqual("0", intervals_to_text([{0,0}])),
+    ?_assertEqual("0-2", intervals_to_text([{0,2}])),
+    ?_assertEqual("0-2, 5-7", intervals_to_text([{0,2},{5,7}])),
+    ?_assertEqual("0-71", intervals_to_text([{0,71}])),
+    ?_assertEqual([{0,0}], text_to_intervals("0")),
+    ?_assertEqual([{0,2},{5,7}], text_to_intervals("0-2, 5-7")),
+    ?_assertEqual([{0,71}], text_to_intervals("0-71"))
+].
 
 % end of file

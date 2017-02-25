@@ -12,8 +12,9 @@
 
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([txsend/5]).
+-export([txsend/4]).
 
+-include_lib("lorawan_server_api/include/lorawan_application.hrl").
 -include("lorawan.hrl").
 
 -record(state, {sock, pulladdr}).
@@ -45,6 +46,7 @@ handle_info({udp, Socket, Host, Port, <<Version, Token:16, 0, MAC:8/binary, Data
     case jsx:is_json(Data) of
         true ->
             Data2 = jsx:decode(Data, [{labels, atom}]),
+            % lager:debug("---> ~w", [Data2]),
             lists:foreach(
                 fun ({rxpk, Pk}) -> rxpk(MAC, Pk);
                     ({stat, Pk}) -> status(MAC, Pk)
@@ -62,7 +64,7 @@ handle_info({udp, Socket, Host, Port, <<Version, Token:16, 2, MAC:8/binary>>}, #
         {ok, {Host, Port, Version}} ->
             Dict;
         _Else ->
-            lager:info("Gateway ~w connected to ~w:~w", [MAC, Host, Port]),
+            lager:info("Gateway ~w at ~w:~w", [MAC, Host, Port]),
             dict:store(MAC, {Host, Port, Version}, Dict)
     end,
     % PULL ACK
@@ -107,22 +109,22 @@ rxpk(MAC, PkList) ->
     % due to reflections the gateways may have received the same frame twice
     Unique = remove_duplicates(PkList2, []),
     % handle the frames sequentially
-    lists:foreach(fun({RxQ, RF, PHYPayload}) ->
-        lorawan_handler:handle_rxpk(MAC, RxQ, RF, PHYPayload) end, Unique).
+    lists:foreach(fun({RxQ, PHYPayload}) ->
+        lorawan_handler:handle_rxpk(MAC, RxQ, PHYPayload) end, Unique).
 
-remove_duplicates([{RxQ, RF, PHYPayload} | Tail], Unique) ->
+remove_duplicates([{RxQ, PHYPayload} | Tail], Unique) ->
     % check if the first element is duplicate
-    case lists:keytake(PHYPayload, 3, Tail) of
-        {value, {RxQ2, RF2, PHYPayload}, Tail2} ->
+    case lists:keytake(PHYPayload, 2, Tail) of
+        {value, {RxQ2, PHYPayload}, Tail2} ->
             % select element of a better quality and re-check for other duplicates
             if
                 RxQ#rxq.rssi >= RxQ2#rxq.rssi ->
-                    remove_duplicates([{RxQ, RF, PHYPayload} | Tail2], Unique);
+                    remove_duplicates([{RxQ, PHYPayload} | Tail2], Unique);
                 true -> % else
-                    remove_duplicates([{RxQ2, RF2, PHYPayload} | Tail2], Unique)
+                    remove_duplicates([{RxQ2, PHYPayload} | Tail2], Unique)
             end;
         false ->
-            remove_duplicates(Tail, [{RxQ, RF, PHYPayload} | Unique])
+            remove_duplicates(Tail, [{RxQ, PHYPayload} | Unique])
     end;
 remove_duplicates([], Unique) ->
     Unique.
@@ -135,19 +137,22 @@ status(MAC, Pk) ->
             lager:error("ERROR: ~w", [Error])
     end.
 
-txsend(Pid, MAC, Time, RF, PHYPayload) ->
+txsend(Pid, Gateway, TxQ, PHYPayload) ->
     % TX only supported on radio A
-    Pk = jsx:encode([{txpk, build_txpk(#txq{tmst=Time, rfch=0, powe=14}, RF, PHYPayload)}]),
-    gen_server:cast(Pid, {send, MAC, Pk}).
+    Pk = [{txpk, build_txpk(TxQ#txq{rfch=Gateway#gateway.tx_rfch}, PHYPayload)}],
+    % lager:debug("<--- ~w", [Pk]),
+    gen_server:cast(Pid, {send, Gateway#gateway.mac, jsx:encode(Pk)}).
 
 parse_rxpk(Pk) ->
     Data = base64:decode(proplists:get_value(data, Pk)),
     case proplists:get_value(modu, Pk) of
-        <<"LORA">> -> {?to_record(rxq, Pk), ?to_record(rflora, Pk), Data}
+        <<"LORA">> ->
+            RxQ = ?to_record(rxq, Pk),
+            {RxQ#rxq{erlst=erlang:monotonic_time(milli_seconds)}, Data}
     end.
 
-build_txpk(TxQ, RF, Data) ->
-    ?to_proplist(txq, TxQ) ++ ?to_proplist(rflora, RF) ++ 
+build_txpk(TxQ, Data) ->
+    ?to_proplist(txq, TxQ) ++
         [{imme, false}, {modu, <<"LORA">>}, {ipol, true}, {size, byte_size(Data)}, {data, base64:encode(Data)}].
 
 % end of file

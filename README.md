@@ -7,7 +7,10 @@ or for device and application developers.
 The server:
  * Communicates with (any number of) remote LoRaWAN gateways. It currently supports:
    * All gateways based on the [Packet Forwarder](https://github.com/Lora-net/packet_forwarder),
-     such as the Semtech LoRa demo kit and [LORANK-8](http://webshop.ideetron.nl/LORANK-8) gateways.
+     such as the Semtech LoRa demo kit,
+     [LoRa Lite Gateway](https://wireless-solutions.de/products/long-range-radio/lora_lite_gateway.html),
+     [LORANK-8](http://webshop.ideetron.nl/LORANK-8),
+     or [MultiConnect Conduit](http://www.multitech.com/brands/multiconnect-conduit).
  * Performs all required encryption and integrity checks.
  * Invokes internal modules with application logic. It provides examples for:
    * [Semtech/IMST LoRaMote](http://webshop.imst.de/loramote-lora-evaluation-tool.html)
@@ -17,10 +20,12 @@ The server:
  * Supports (any number of) Class A devices.
  * Supports both the activation by personalization and the over-the-air activation.
  * Supports both unconfirmed and confirmed data uplink and downlink.
- * Supports the EU868 and EU433 bands.
+ * Supports the EU 863-870, US 902-928, CN 779-787, EU 433, AU 915-928 and CN 470-510 band.
  * Supports per-node configuration of TX power and data rate (manual ADR).
  * Runs on all major operating systems, including Windows, Linux, OS X and Solaris,
-   even in a Docker container.
+   even on embedded systems like OpenWrt or in a Docker container.
+ * Does not crash as it's implemented in [Erlang](https://www.erlang.org/), which is
+   designed for building fault-tolerant systems.
  * Is free, distributed under the MIT license.
 
 The server aims to be an all-in-one software package for small private LoRa networks.
@@ -38,14 +43,18 @@ if you find a bug or miss a feature.
 
 ## Documentation
 
-The lorawan-server includes all components required to run a private LoRa network:
+The lorawan-server includes all functions required to run a private LoRa network.
+You only need to install the [Erlang/OTP](http://www.erlang.org) 18 or later.
+
+The main components of the lorawan-server are shown in the following figure:
+
 ![alt tag](https://raw.githubusercontent.com/gotthardp/lorawan-server/master/doc/images/server-architecture.png)
 
 ### Usage
 
 The [Installation Instructions](doc/Installation.md) describe how to build,
-install and configure the server. You can either download a binary release or
-build it from source codes.
+install and configure the server. You can use a Debian package, download the binary
+release and run it manually or build the server from source codes.
 
 Run the lorawan-server release by:
 ```bash
@@ -59,8 +68,8 @@ as described in the [Administration Guide](doc/Administration.md) and in the
 
 After the installation you have to:
  * Add LoRaWAN gateways you want to use.
- * Configure each device you want to use, either as a personalized device or
-   as an OTAA device.
+ * Configure each device you want to use, either as a personalized device (ABP) or
+   as an over-the-air activated (OTAA) device.
 
 Use the `dbexport` script to backup your list of users, gateways, devices and links.
 This will create several `db*.json` files. Use the `dbimport` script to write these

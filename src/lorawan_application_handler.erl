@@ -31,10 +31,6 @@ invoke_init({AppID, Module}) when is_atom(Module) ->
     apply(Module, init, [AppID]).
 
 handle_join(DevAddr, App, AppID) ->
-    % delete previously stored RX and TX frames
-    lorawan_db:purge_rxframes(DevAddr),
-    lorawan_db:purge_txframes(DevAddr),
-    % callback
     invoke_handler(handle_join, App, [DevAddr, App, AppID]).
 
 handle_rx(DevAddr, App, AppID, RxData) ->
@@ -45,8 +41,19 @@ invoke_handler(Fun, App, Params) ->
     case proplists:get_value(App, Modules) of
         undefined ->
             {error, {unknown_app, App}};
+        {_, Module} ->
+            invoke_handler2(Module, Fun, Params);
         Module ->
-            apply(Module, Fun, Params)
+            invoke_handler2(Module, Fun, Params)
+    end.
+
+invoke_handler2(Module, Fun, Params) ->
+    case erlang:function_exported(Module, Fun, length(Params)) of
+        true ->
+            apply(Module, Fun, Params);
+        false ->
+            lager:warning("function ~w:~w/~w not exported", [Module, Fun, length(Params)]),
+            ok
     end.
 
 store_frame(DevAddr, TxData) ->

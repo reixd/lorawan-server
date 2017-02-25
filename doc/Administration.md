@@ -18,12 +18,13 @@ The following REST resources are made available:
   /users/*ABC*    | GET, PUT, DELETE | User *ABC*
   /gateways       | GET, POST        | LoRaWAN gateways
   /gateways/*123* | GET, PUT, DELETE | Gateway with MAC=*123*
-  /devices        | GET, POST        | Devices registered for over-the-air activation
+  /devices        | GET, POST        | Devices registered for over-the-air activation (OTAA)
   /devices/*123*  | GET, PUT, DELETE | Device with DevEUI=*123*
-  /links          | GET, POST        | Activated devices
-  /links/*123*    | GET, PUT, DELETE | Activated device with DevAddr=*123*
+  /links          | GET, POST        | Active devices, both ABP and activated OTAA
+  /links/*123*    | GET, PUT, DELETE | Active device with DevAddr=*123*
   /txframes       | GET              | Frames scheduled for transmission
   /txframes/*123* | GET, DELETE      | Frame with ID=*123*
+  /rxframes       | GET              | Recent received frames
 
 ## Web Admin
 
@@ -33,7 +34,7 @@ the REST API.
 You (at least) have to:
  * Add LoRaWAN gateways you want to use to the *Gateways* list.
  * Configure each device you want to use:
-   * To add a personalized device, create a new *Links* list entry.
+   * To add a device activated by personalization (ABP), create a new *Links* list entry.
    * To add an OTAA device, create a new *Devices* list entry and start the device. The *Links*
      list will be updated automatically once the device joins the network.
 
@@ -45,6 +46,7 @@ List of user identities that can manage the server. All have the same access rig
 
 For each LoRaWAN gateway you can set:
  * *MAC* address of the gateway
+ * *TX Channel* used for downlinks; usually 0
  * *NetID* of the network
  * *Location* and *Altitude* of the gateway
 
@@ -54,9 +56,17 @@ For each LoRaWAN gateway you can set:
 
 For each device, which may connect to your network, you can set:
  * *DevEUI* of the device
+ * *Region* that determines the LoRaWAN regional parameters
  * *Application* identifier corresponding to one of the [Handlers](Handlers.md) configured.
  * *AppID*, which is a string with application-specific configuration.
  * *AppEUI* and *AppKey*
+ * *FCnt Check* to be used for this device
+   * *Strict 16-bit* (default) or *Strict 32-bit* indicate a standard compliant counter.
+   * *Reset on zero* allows personalized (ABP) devices to reset the counter.
+     This weakens device security a bit as more reply attacks are possible.
+   * *Disabled* disables the check for faulty devices.
+     This destroys the device security.
+ * *Can Join?* flag that allows you to prevent the device from joining
 
 Once the device joins the network, the *Link* field will contain a reference to the *Links* list.
 
@@ -69,9 +79,11 @@ joins the network, the server will attempt to configure the device accordingly.
 
 For each device, which is connected (has a link) to the network, you can set:
  * *DevEUI* of the device
+ * *Region* that determines the LoRaWAN regional parameters
  * *Application* identifier corresponding to one of the [Handlers](Handlers.md) configured.
  * *AppID*, which is a string with application-specific configuration.
  * *NwkSKey* and *AppSKey*
+ * *FCnt Check* to be used for this device (see the Devices section for more explanation).
 
 Optionally, you can also set the [ADR](ADR.md) parameters. The server will attempt
 to configure the device accordingly.

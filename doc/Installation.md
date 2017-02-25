@@ -4,36 +4,72 @@ This document describes how to build, install and configure the lorawan-server.
 
 ## Installation
 
-You will need the Erlang/OTP 18 or later.
- * On Linux, try typing `yum install erlang` or `apt-get install erlang`.
- * On Windows, install the [32-bit or 64-bit Binary File](http://www.erlang.org/downloads).
+### Using the Debian package
+
+On the Debian Linux and its clones like Raspbian you can use the .deb package.
+
+Download the Debian package
+[lorawan-server-<VERSION>.deb](https://github.com/gotthardp/lorawan-server/releases)
+and install it by:
+```bash
+dpkg -i lorawan-server-<VERSION>.deb
+```
+
+Then start the server by `systemctl start lorawan-server`.
+
+### Using the Binary Release on Linux
+
+You will need the Erlang/OTP 18 or later. Try typing `yum install erlang` or
+`apt-get install erlang`.
 
 Then download the latest binary release
-[lorawan-server-0.2.0.tar.gz](https://github.com/gotthardp/lorawan-server/releases)
+[lorawan-server-<VERSION>.tar.gz](https://github.com/gotthardp/lorawan-server/releases)
 and (on Linux) unpack it by:
 ```bash
 mkdir lorawan-server
-mv lorawan-server-0.2.0.tar.gz lorawan-server/
+mv lorawan-server-<VERSION>.tar.gz lorawan-server/
 cd lorawan-server
-tar -zxvf lorawan-server-0.2.0.tar.gz
+tar -zxvf lorawan-server-<VERSION>.tar.gz
 ```
 
-On Windows you can use the [7-Zip](http://www.7-zip.org).
+You can run the server by:
+```bash
+bin/lorawan-server
+```
+
+The lorawan-server can be started in background as a daemon.
+On Linux systems with systemd you should:
+ * Unpack the binary release to `/usr/lib/lorawan-server`
+ * Copy `bin/lorawan-server.service` to `/lib/systemd/system`
+ * Create a dedicated user by `useradd --home-dir /var/lib/lorawan-server --create-home lorawan`
+ * Start the server by `systemctl start lorawan-server`
+
+### Using the Binary Release on Windows
+
+Install the [32-bit or 64-bit Binary File](http://www.erlang.org/downloads) of
+Erlang/OTP 18 or later.
+
+Unpack the release using the [7-Zip](http://www.7-zip.org) and run the server by
+```bash
+bin/lorawan-server.bat
+```
+
+You can also run the lorawan-server as a Windows service.
+The service is managed using `bin/lorawan-service.bat` *command*, where:
+ * *add* will add the service. Once added you can use the standard Windows control
+   panel administrative tools to start/stop or enable/disable the service.
+ * *remove* will remove the previously added service.
+ * *list* will display parameters of a previously added service.
 
 ## Server Configuration
 
-Review the `lorawan-server/releases/0.2.0/sys.config` with the server configuration:
- * By default the EU868 band is enabled. If you want to use another band,
-   uncomment the respective `rx2_rf` field.
+Review the `lorawan-server/releases/<VERSION>/sys.config` with the server configuration:
  * To enable/disable applications, modify the `plugins` section. For more details
    see the [Handler Development Guide](Handlers.md).
 
 For example:
 ```erlang
 [{lorawan_server, [
-    % default RX2 frequency, data rate and coding rate
-    {rx2_rf, {869.525, 3, <<"4/5">>}},
-    % {rx2_rf, {434.665, 3, <<"4/5">>}},
     % update this list to add/remove applications
     {plugins, [
         {<<"semtech-mote">>, lorawan_application_semtech_mote},
@@ -47,6 +83,12 @@ For example:
     {http_admin_credentials, {<<"admin">>, <<"admin">>}}
 ]}].
 ```
+
+Review the `lorawan-server/lib/lorawan_server-<VERSION>/priv/admin/admin.js` with the
+admin configuration:
+ * You may need to obtain a [Google API](https://console.developers.google.com) key for
+   the Google Maps and enter it in `GoogleMapsKey`. For deployments on a local network
+   this is not needed.
 
 You may need to enable communication channels from LoRaWAN gateways in your firewall.
 If you use the `firewalld` (Fedora, RHEL, CentOS) do:
